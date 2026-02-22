@@ -84,6 +84,17 @@ These quirks don't break the system - robust parsing handles them.
 - GPU acceleration
 - Or async processing with user feedback
 
+## Development Progress
+
+Each milestone was developed incrementally:
+
+| PR | Milestone | What It Proved |
+|----|-----------|----------------|
+| [#1](https://github.com/swmcc/indexatron/pull/1) | Ollama Connection | Local LLM runtime accessible |
+| [#2](https://github.com/swmcc/indexatron/pull/2) | Image Analysis | LLaVA extracts useful metadata |
+| [#3](https://github.com/swmcc/indexatron/pull/3) | Embeddings | 768-dim vectors for similarity |
+| [#4](https://github.com/swmcc/indexatron/pull/4) | Batch Processing | Scalable to many images |
+
 ## Technical Stack
 
 ```
