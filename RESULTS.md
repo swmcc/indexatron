@@ -90,7 +90,6 @@ Each milestone was developed incrementally:
 
 | PR | Milestone | What It Proved |
 |----|-----------|----------------|
-| — | [00-initial](https://github.com/swmcc/indexatron/tree/00-initial) | Empty starting point |
 | [#5](https://github.com/swmcc/indexatron/pull/5) | Project Setup | Foundation ready |
 | [#1](https://github.com/swmcc/indexatron/pull/1) | Ollama Connection | Local LLM runtime accessible |
 | [#2](https://github.com/swmcc/indexatron/pull/2) | Image Analysis | LLaVA extracts useful metadata |
