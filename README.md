@@ -8,6 +8,8 @@ An experimental Python service that uses local LLMs via Ollama to analyze family
 
 This is a **science experiment** - proving that local AI can meaningfully analyze family photos before integrating with a production system.
 
+**📊 [View Full Results](RESULTS.md)** - Detailed analysis of what worked, quirks discovered, and sample outputs.
+
 | Branch | Status | What it proves |
 |--------|--------|----------------|
 | `01-project-setup` | ✅ | Project structure works |
