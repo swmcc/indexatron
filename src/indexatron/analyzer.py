@@ -81,9 +81,17 @@ class PhotoAnalyzer:
 
     MODEL = "llava:7b"
 
-    def _enrich_categories(self, categories: list[str]) -> list[str]:
+    def _enrich_categories(self, categories: list) -> list[str]:
         """Add parent categories based on hierarchy mapping."""
-        enriched = set(cat.lower() for cat in categories)
+        # Flatten any nested lists and convert to strings
+        flat = []
+        for cat in categories:
+            if isinstance(cat, list):
+                flat.extend(str(c) for c in cat)
+            else:
+                flat.append(str(cat))
+
+        enriched = set(c.lower() for c in flat)
 
         for cat in list(enriched):
             if cat in CATEGORY_HIERARCHY:
