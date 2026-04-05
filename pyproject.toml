@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "indexatron"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI-powered family photo analysis using local LLMs"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,14 +12,20 @@ dependencies = [
     "ollama>=0.4.0",
     "pillow>=10.0.0",
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
     "rich>=13.0.0",
+    "httpx>=0.27.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "pytest-httpx>=0.30.0",
     "ruff>=0.1.0",
 ]
+
+[project.scripts]
+indexatron = "indexatron.cli:main"
 
 [tool.ruff]
 line-length = 100
