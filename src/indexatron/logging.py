@@ -44,12 +44,23 @@ def setup_logging() -> None:
     logger.setLevel(level)
 
 
-def debug_request(method: str, url: str, headers: dict | None = None, body: Any = None) -> None:
+def debug_request(
+    method: str,
+    url: str,
+    headers: dict | None = None,
+    body: Any = None,
+    params: dict | None = None,
+) -> None:
     """Log HTTP request details in debug mode."""
     if not get_settings().debug:
         return
 
-    parts = [f"[bold cyan]{method}[/bold cyan] {url}"]
+    display_url = url
+    if params:
+        param_str = "&".join(f"{k}={v}" for k, v in params.items())
+        display_url = f"{url}?{param_str}"
+
+    parts = [f"[bold cyan]{method}[/bold cyan] {display_url}"]
 
     if headers:
         # Mask authorization header
