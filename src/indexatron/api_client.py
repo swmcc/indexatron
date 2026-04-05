@@ -37,6 +37,7 @@ class McculloghsClient:
 
         self._client = httpx.Client(
             timeout=self.timeout,
+            follow_redirects=True,
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
