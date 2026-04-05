@@ -11,7 +11,30 @@ from .models import PhotoAnalysis, LocationInfo, PersonInfo, EraEstimate
 
 console = Console()
 
-ANALYSIS_PROMPT = """Analyze this family photo and provide a detailed JSON response with the following structure:
+# Category hierarchy - if we see any key, add its values as parent categories
+CATEGORY_HIERARCHY = {
+    # Pets
+    "puppy": ["pet", "dog", "animal"],
+    "dog": ["pet", "animal"],
+    "kitten": ["pet", "cat", "animal"],
+    "cat": ["pet", "animal"],
+    "pet": ["animal"],
+    # Events
+    "christmas": ["holiday", "celebration"],
+    "birthday": ["celebration", "party"],
+    "wedding": ["celebration", "event"],
+    "graduation": ["celebration", "event"],
+    "easter": ["holiday", "celebration"],
+    "thanksgiving": ["holiday", "celebration"],
+    "halloween": ["holiday", "celebration"],
+    # Family
+    "baby": ["family", "child"],
+    "toddler": ["family", "child"],
+    "child": ["family"],
+    "kids": ["family", "children"],
+}
+
+ANALYSIS_PROMPT = """Analyze this family photo and provide a detailed JSON response:
 
 {
   "description": "A detailed description of what's happening in the photo",
@@ -27,7 +50,7 @@ ANALYSIS_PROMPT = """Analyze this family photo and provide a detailed JSON respo
       "position": "where in the frame: left, center, right, background"
     }
   ],
-  "categories": ["list", "of", "relevant", "tags"],
+  "categories": ["hierarchical", "tags", "from specific to general"],
   "era": {
     "decade": "estimated decade like 1990s or 2000s",
     "confidence": "low, medium, or high",
@@ -41,9 +64,14 @@ ANALYSIS_PROMPT = """Analyze this family photo and provide a detailed JSON respo
 Focus on:
 - Family relationships if apparent
 - Activities happening
-- Special occasions (birthdays, holidays, etc.)
+- Special occasions (birthdays, holidays, christmas, easter, etc.)
 - Photo quality and style for era estimation
 - Clothing and objects for context
+
+For categories, include BOTH specific and general tags. Examples:
+- A puppy photo: ["puppy", "dog", "pet", "animal"]
+- A Christmas photo: ["christmas", "holiday", "celebration", "family"]
+- A baby photo: ["baby", "infant", "child", "family"]
 
 Respond with ONLY valid JSON, no other text."""
 
@@ -52,6 +80,16 @@ class PhotoAnalyzer:
     """Analyzes photos using LLaVA vision model."""
 
     MODEL = "llava:7b"
+
+    def _enrich_categories(self, categories: list[str]) -> list[str]:
+        """Add parent categories based on hierarchy mapping."""
+        enriched = set(cat.lower() for cat in categories)
+
+        for cat in list(enriched):
+            if cat in CATEGORY_HIERARCHY:
+                enriched.update(CATEGORY_HIERARCHY[cat])
+
+        return sorted(enriched)
 
     def analyze(self, image_path: Path) -> PhotoAnalysis:
         """Analyze a single image and return structured results."""
@@ -206,6 +244,9 @@ class PhotoAnalyzer:
         categories = data.get("categories", [])
         if isinstance(categories, dict):
             categories = list(categories.values()) if categories else []
+
+        # Enrich categories with parent categories from hierarchy
+        categories = self._enrich_categories(categories)
 
         return PhotoAnalysis(
             filename=filename,
