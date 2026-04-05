@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from PIL import Image
 
 from .config import get_settings
 from .logging import (
@@ -109,16 +110,7 @@ class McculloghsClient:
         image_url = upload["image_url"]
         short_code = upload["short_code"]
 
-        # Determine file extension from URL or default to .jpg
-        ext = ".jpg"
-        if "." in image_url.split("/")[-1]:
-            url_ext = "." + image_url.split(".")[-1].split("?")[0]
-            if url_ext in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
-                ext = url_ext
-
-        output_path = self.download_dir / f"{short_code}{ext}"
-
-        debug(f"Downloading {image_url} to {output_path}")
+        debug(f"Downloading {image_url}")
         debug_request("GET", image_url)
         start = time.time()
 
@@ -127,6 +119,19 @@ class McculloghsClient:
             with self._client.stream("GET", image_url) as response:
                 response.raise_for_status()
 
+                # Get extension from Content-Type header
+                content_type = response.headers.get("content-type", "")
+                ext_map = {
+                    "image/jpeg": ".jpg",
+                    "image/png": ".png",
+                    "image/gif": ".gif",
+                    "image/webp": ".webp",
+                }
+                ext = ext_map.get(content_type.split(";")[0], ".jpg")
+                output_path = self.download_dir / f"{short_code}{ext}"
+
+                debug(f"Content-Type: {content_type}, saving as {output_path}")
+
                 with open(output_path, "wb") as f:
                     for chunk in response.iter_bytes(chunk_size=8192):
                         f.write(chunk)
@@ -134,6 +139,18 @@ class McculloghsClient:
             elapsed = time.time() - start
             size_mb = output_path.stat().st_size / (1024 * 1024)
             debug_response(200, body=f"{size_mb:.2f}MB downloaded", elapsed=elapsed)
+
+            # Convert WebP to JPG (LLaVA doesn't support WebP)
+            if output_path.suffix.lower() == ".webp":
+                jpg_path = output_path.with_suffix(".jpg")
+                debug(f"Converting WebP to JPG: {jpg_path}")
+                with Image.open(output_path) as img:
+                    # Convert to RGB (WebP might have alpha channel)
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
+                    img.save(jpg_path, "JPEG", quality=90)
+                output_path.unlink()  # Remove original WebP
+                output_path = jpg_path
 
             return output_path
 
