@@ -140,17 +140,29 @@ class McculloghsClient:
             size_mb = output_path.stat().st_size / (1024 * 1024)
             debug_response(200, body=f"{size_mb:.2f}MB downloaded", elapsed=elapsed)
 
-            # Convert WebP to JPG (LLaVA doesn't support WebP)
-            if output_path.suffix.lower() == ".webp":
+            # Process image: convert format and resize for faster inference
+            with Image.open(output_path) as img:
+                original_size = img.size
+
+                # Convert to RGB if needed (WebP/PNG might have alpha)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+
+                # Resize to max 1024px on longest side for faster inference
+                # Vision models don't need full resolution to understand content
+                max_dim = 1024
+                if max(img.size) > max_dim:
+                    img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+                    debug(f"Resized {original_size} -> {img.size} for faster inference")
+
+                # Save as JPG (better compatibility than WebP)
                 jpg_path = output_path.with_suffix(".jpg")
-                debug(f"Converting WebP to JPG: {jpg_path}")
-                with Image.open(output_path) as img:
-                    # Convert to RGB (WebP might have alpha channel)
-                    if img.mode in ("RGBA", "P"):
-                        img = img.convert("RGB")
-                    img.save(jpg_path, "JPEG", quality=90)
-                output_path.unlink()  # Remove original WebP
-                output_path = jpg_path
+                img.save(jpg_path, "JPEG", quality=85)
+
+            # Remove original if it was a different format
+            if output_path != jpg_path:
+                output_path.unlink()
+            output_path = jpg_path
 
             return output_path
 
