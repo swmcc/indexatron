@@ -35,6 +35,15 @@ CATEGORY_HIERARCHY = {
     "kids": ["family", "children"],
 }
 
+# Terms to filter out from categories and descriptions (inappropriate for family photos)
+BLOCKED_TERMS = {
+    "grooming", "beauty", "beautiful", "sexy", "attractive", "hot",
+    "gorgeous", "stunning", "pretty girl", "handsome boy",
+}
+
+# Maximum number of categories to keep (prevents runaway repetition)
+MAX_CATEGORIES = 20
+
 BASE_ANALYSIS_PROMPT = """Analyze this family photo and provide a detailed JSON response:
 
 {
@@ -130,7 +139,10 @@ class PhotoAnalyzer:
         self.model = self.settings.vision_model
 
     def _enrich_categories(self, categories: list) -> list[str]:
-        """Add parent categories based on hierarchy mapping."""
+        """Add parent categories based on hierarchy mapping.
+
+        Also filters blocked terms and limits total count.
+        """
         # Flatten any nested lists and convert to strings
         flat = []
         for cat in categories:
@@ -139,13 +151,21 @@ class PhotoAnalyzer:
             else:
                 flat.append(str(cat))
 
-        enriched = set(c.lower() for c in flat)
+        # Deduplicate and lowercase
+        enriched = set(c.lower().strip() for c in flat if c)
 
+        # Filter out blocked terms
+        enriched = {c for c in enriched if c not in BLOCKED_TERMS}
+
+        # Add parent categories from hierarchy
         for cat in list(enriched):
             if cat in CATEGORY_HIERARCHY:
                 enriched.update(CATEGORY_HIERARCHY[cat])
 
-        return sorted(enriched)
+        # Limit total count to prevent runaway repetition
+        result = sorted(enriched)[:MAX_CATEGORIES]
+
+        return result
 
     def analyze(self, image_path: Path, metadata: dict | None = None) -> PhotoAnalysis:
         """Analyze a single image and return structured results.
@@ -196,8 +216,49 @@ class PhotoAnalyzer:
         # Build the structured result
         return self._build_analysis(image_path.name, analysis_data, raw_response, self.model)
 
+    def _sanitize_text(self, text: str) -> str:
+        """Remove inappropriate phrases from text."""
+        if not text:
+            return text
+
+        result = text
+        # Remove phrases like "most beautiful girl" etc.
+        inappropriate_phrases = [
+            r"most beautiful\s+\w+",
+            r"beautiful\s+girl",
+            r"beautiful\s+boy",
+            r"pretty\s+girl",
+            r"handsome\s+boy",
+            r"gorgeous\s+\w+",
+            r"stunning\s+\w+",
+        ]
+        for pattern in inappropriate_phrases:
+            result = re.sub(pattern, "child", result, flags=re.IGNORECASE)
+
+        return result
+
     def _parse_response(self, response: str) -> dict:
         """Parse JSON from LLM response, handling common issues."""
+        # Detect repetition loop (model gone haywire)
+        if response.count('"grooming"') > 3 or response.count('"beauty"') > 3:
+            console.print("[yellow]Warning: Detected repetition loop in model output[/yellow]")
+            # Try to extract just the first valid JSON object before the loop
+            first_categories = response.find('"categories"')
+            if first_categories > 0:
+                # Find the closing bracket of the first categories array
+                bracket_start = response.find("[", first_categories)
+                if bracket_start > 0:
+                    depth = 0
+                    for i, c in enumerate(response[bracket_start:], bracket_start):
+                        if c == "[":
+                            depth += 1
+                        elif c == "]":
+                            depth -= 1
+                            if depth == 0:
+                                # Truncate after first categories array
+                                response = response[:i + 1] + "}"
+                                break
+
         # Try direct JSON parse first
         try:
             return json.loads(response)
@@ -272,14 +333,15 @@ class PhotoAnalyzer:
                     specific=loc_data.get("specific"),
                 )
 
-        # Parse people
+        # Parse people (sanitize descriptions)
         people = []
         for person_data in data.get("people", []):
             if isinstance(person_data, dict):
+                description = self._sanitize_text(person_data.get("description", "person"))
                 people.append(
                     PersonInfo(
                         name=person_data.get("name"),
-                        description=person_data.get("description", "person"),
+                        description=description,
                         estimated_age=person_data.get("estimated_age"),
                         position=person_data.get("position"),
                     )
@@ -326,15 +388,18 @@ class PhotoAnalyzer:
         # Enrich categories with parent categories from hierarchy
         categories = self._enrich_categories(categories)
 
+        # Sanitize the main description
+        description = self._sanitize_text(data.get("description", "No description available"))
+
         return PhotoAnalysis(
             filename=filename,
             model_used=model,
-            description=data.get("description", "No description available"),
+            description=description,
             location=location,
             people=people,
             categories=categories if isinstance(categories, list) else [],
             era=era,
-            mood=data.get("mood"),
+            mood=self._sanitize_text(data.get("mood")),
             colors=colors if isinstance(colors, list) else [],
             objects=objects if isinstance(objects, list) else [],
             raw_response=raw_response,
