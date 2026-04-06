@@ -13,6 +13,17 @@ A Python service that uses local LLMs via Ollama to analyze family photos. Integ
 - **Safety Filters** - Blocks inappropriate terms, limits category count to prevent repetition loops
 - **Reprocessing** - Re-analyse specific photos by shortcode
 
+## Development
+
+| PR | Milestone | Status |
+|----|-----------|--------|
+| [#5](https://github.com/swmcc/indexatron/pull/5) | Project Setup | ✅ |
+| [#1](https://github.com/swmcc/indexatron/pull/1) | Ollama Connection | ✅ |
+| [#2](https://github.com/swmcc/indexatron/pull/2) | Image Analysis | ✅ |
+| [#3](https://github.com/swmcc/indexatron/pull/3) | Embeddings | ✅ |
+| [#4](https://github.com/swmcc/indexatron/pull/4) | Batch Processing | ✅ |
+| [#6](https://github.com/swmcc/indexatron/pull/6) | API Integration | ✅ |
+
 ## Architecture
 
 ```
