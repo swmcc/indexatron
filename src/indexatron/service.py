@@ -169,6 +169,13 @@ class IndexatronService:
                 "date_taken": upload.get("date_taken"),
             }
 
+            # Log metadata if present
+            if any(metadata.values()):
+                info(f"Using metadata: title={metadata.get('title')}, "
+                     f"caption={metadata.get('caption')}, date={metadata.get('date_taken')}")
+            else:
+                debug("No metadata available for this upload")
+
             # Analyze with vision model
             debug(f"Analyzing {short_code} with vision model...")
             start = time.time()
