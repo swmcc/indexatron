@@ -113,11 +113,15 @@ def build_analysis_prompt(metadata: dict | None = None) -> str:
 
     # Add gallery context first (provides overall theme)
     if metadata.get("gallery_name"):
-        directives.append(f"This photo is from the album: \"{metadata['gallery_name']}\"")
+        gallery_context = f"This photo is from the album: \"{metadata['gallery_name']}\""
+        if metadata.get("gallery_description"):
+            gallery_context += f" - {metadata['gallery_description']}"
+        directives.append(gallery_context)
 
-    # Extract names from title/caption/gallery
+    # Extract names from title/caption/gallery (including gallery description)
     all_text = (
         f"{metadata.get('gallery_name', '')} "
+        f"{metadata.get('gallery_description', '')} "
         f"{metadata.get('title', '')} "
         f"{metadata.get('caption', '')}"
     )
