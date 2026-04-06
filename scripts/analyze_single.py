@@ -9,8 +9,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.json import JSON
+from rich.panel import Panel
 
 from indexatron.analyzer import PhotoAnalyzer
 
@@ -46,7 +46,8 @@ def main():
 
     # Display result
     console.print("\n")
-    console.print(Panel(JSON(json.dumps(display_data, indent=2, default=str)), title="📸 Analysis Result"))
+    json_content = JSON(json.dumps(display_data, indent=2, default=str))
+    console.print(Panel(json_content, title="📸 Analysis Result"))
     console.print(f"\n[green]✓[/green] Saved to: {output_file}\n")
 
 

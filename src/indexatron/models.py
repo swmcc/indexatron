@@ -35,7 +35,7 @@ class PhotoAnalysis(BaseModel):
 
     filename: str
     analyzed_at: datetime = Field(default_factory=datetime.utcnow)
-    model_used: str = "llava:7b"
+    model_used: str = "llama3.2-vision"
 
     description: str = Field(description="Detailed description of the photo")
     location: Optional[LocationInfo] = None

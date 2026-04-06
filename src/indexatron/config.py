@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Ollama
     ollama_host: str = "http://localhost:11434"
-    vision_model: str = "llava:7b"
+    vision_model: str = "llama3.2-vision"
     embedding_model: str = "nomic-embed-text"
 
     # Processing
