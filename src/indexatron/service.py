@@ -167,12 +167,14 @@ class IndexatronService:
                 "title": upload.get("title"),
                 "caption": upload.get("caption"),
                 "date_taken": upload.get("date_taken"),
+                "gallery_name": upload.get("gallery_name"),
             }
 
             # Log metadata if present
             if any(metadata.values()):
-                info(f"Using metadata: title={metadata.get('title')}, "
-                     f"caption={metadata.get('caption')}, date={metadata.get('date_taken')}")
+                info(f"Using metadata: gallery={metadata.get('gallery_name')}, "
+                     f"title={metadata.get('title')}, caption={metadata.get('caption')}, "
+                     f"date={metadata.get('date_taken')}")
             else:
                 debug("No metadata available for this upload")
 
