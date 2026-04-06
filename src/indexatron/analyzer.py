@@ -100,7 +100,7 @@ def build_analysis_prompt(metadata: dict | None = None) -> str:
     """Build the analysis prompt with explicit metadata instructions.
 
     Args:
-        metadata: Optional dict with title, caption, date_taken
+        metadata: Optional dict with title, caption, date_taken, gallery_name
 
     Returns:
         Complete prompt string
@@ -111,8 +111,16 @@ def build_analysis_prompt(metadata: dict | None = None) -> str:
     # Build directive instructions based on metadata
     directives = []
 
-    # Extract names from title/caption
-    all_text = f"{metadata.get('title', '')} {metadata.get('caption', '')}"
+    # Add gallery context first (provides overall theme)
+    if metadata.get("gallery_name"):
+        directives.append(f"This photo is from the album: \"{metadata['gallery_name']}\"")
+
+    # Extract names from title/caption/gallery
+    all_text = (
+        f"{metadata.get('gallery_name', '')} "
+        f"{metadata.get('title', '')} "
+        f"{metadata.get('caption', '')}"
+    )
     names = _extract_names_from_text(all_text)
 
     if names:
