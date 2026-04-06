@@ -8,6 +8,7 @@ import ollama
 from rich.console import Console
 
 from .config import get_settings
+from .family import extract_family_names, get_family_context
 from .models import EraEstimate, LocationInfo, PersonInfo, PhotoAnalysis
 
 console = Console()
@@ -125,13 +126,25 @@ def build_analysis_prompt(metadata: dict | None = None) -> str:
         f"{metadata.get('title', '')} "
         f"{metadata.get('caption', '')}"
     )
+
+    # Get names from capitalized words
     names = _extract_names_from_text(all_text)
+
+    # Also extract family names from nicknames (e.g., "Wee Mamie" -> "Isobel McCullough")
+    family_names = extract_family_names(all_text)
+    if family_names:
+        # Add family names and include the nickname mapping context
+        names.extend(family_names)
+        directives.append(get_family_context())
+
+    # Deduplicate names
+    names = list(set(names))
 
     if names:
         names_str = ", ".join(names)
         directives.append(
             f"IMPORTANT: This photo includes {names_str}. "
-            f"Use these names in the 'people' array where you can identify them."
+            f"Use these REAL names in the 'people' array."
         )
 
     # Extract decade from date
