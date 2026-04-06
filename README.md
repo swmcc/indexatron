@@ -2,34 +2,38 @@
 
 > *Teaching machines to understand family memories*
 
-An experimental Python service that uses local LLMs via Ollama to analyze family photos. Part of a larger experiment to enable semantic search across decades of family memories.
+A Python service that uses local LLMs via Ollama to analyze family photos. Integrates with [the-mcculloughs.org](https://github.com/swmcc/the-mcculloughs.org) to enable semantic search across decades of family memories.
 
-## 🧪 Experiment Status
+## Features
 
-This is a **science experiment** - proving that local AI can meaningfully analyze family photos before integrating with a production system.
+- **Context-Aware Analysis** - Injects photo metadata (title, caption, date, gallery) into prompts for better results
+- **Family Nickname Resolution** - Maps nicknames to real names (e.g., "Mamie" -> "Isobel McCullough")
+- **Era Override** - Uses actual `date_taken` instead of AI guessing from visual cues
+- **Embeddings** - Generates 768-dimensional vectors with nomic-embed-text for semantic search
+- **Safety Filters** - Blocks inappropriate terms, limits category count to prevent repetition loops
+- **Reprocessing** - Re-analyse specific photos by shortcode
 
-**📊 [View Full Results](RESULTS.md)** - Detailed analysis of what worked, quirks discovered, and sample outputs.
-
-| Branch | Status | What it proves |
-|--------|--------|----------------|
-| `01-project-setup` | ✅ | Project structure works |
-| `02-ollama-connection` | ✅ | Can talk to Ollama |
-| `03-image-analysis` | ✅ | LLaVA understands photos |
-| `04-embedding-generation` | ✅ | Can generate embeddings |
-| `05-batch-processing` | ✅ | Can process many photos |
-
-## 🏗️ Architecture
+## Architecture
 
 ```
+┌─────────────────────────────────────────────────────────┐
+│                the-mcculloughs.org (Rails)              │
+│                                                          │
+│  GET /api/uploads/pending      POST /api/uploads/:id/   │
+│         │                           analysis             │
+│         │                              ▲                 │
+└─────────│──────────────────────────────│─────────────────┘
+          │                              │
+          ▼                              │
 ┌─────────────────────────────────────────────────────────┐
 │                      Indexatron                          │
 │                                                          │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐ │
-│  │   Image     │───▶│   LLaVA     │───▶│  Analysis   │ │
-│  │   Input     │    │   (7B)      │    │   JSON      │ │
-│  └─────────────┘    └─────────────┘    └─────────────┘ │
-│                            │                            │
-│                            ▼                            │
+│  │  Context    │───▶│   LLaVA     │───▶│  Analysis   │ │
+│  │  Builder    │    │   (7B)      │    │   JSON      │ │
+│  │ (metadata,  │    └─────────────┘    └─────────────┘ │
+│  │  aliases)   │           │                            │
+│  └─────────────┘           ▼                            │
 │                     ┌─────────────┐                     │
 │                     │   nomic-    │                     │
 │                     │ embed-text  │                     │
@@ -41,12 +45,6 @@ This is a **science experiment** - proving that local AI can meaningfully analyz
 │                     │  Embedding  │                     │
 │                     └─────────────┘                     │
 └─────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-                    ┌─────────────────┐
-                    │  Results JSON   │
-                    │  (for now)      │
-                    └─────────────────┘
 ```
 
 ## 📋 Prerequisites
@@ -105,63 +103,89 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## 📁 Project Structure
+## Configuration
+
+Create a `.env.development` or `.env.production` file:
+
+```bash
+INDEXATRON_API_KEY=your_api_key
+INDEXATRON_API_BASE_URL=http://localhost:3000
+INDEXATRON_VISION_MODEL=llava:7b
+INDEXATRON_EMBEDDING_MODEL=nomic-embed-text
+INDEXATRON_DEBUG=false
+```
+
+### Family Nickname Mappings
+
+Edit `src/indexatron/family.py` to add your own nickname mappings:
+
+```python
+FAMILY_ALIASES = {
+    "mamie": "Isobel McCullough",
+    "the oul man": "Edmund McCullough",
+    # Add your family nicknames...
+}
+```
+
+## Project Structure
 
 ```
 indexatron/
-├── README.md                 # You are here
-├── requirements.txt          # Python dependencies
-├── pyproject.toml           # Modern packaging
-├── .gitignore
+├── README.md
+├── pyproject.toml
+├── .env.development
+├── .env.production
 │
-├── src/indexatron/          # Main package
-│   ├── __init__.py
-│   ├── client.py            # Ollama client wrapper
-│   ├── analyzer.py          # LLaVA image analysis
-│   ├── embedder.py          # Embedding generation
-│   ├── processor.py         # Batch processing
-│   └── models.py            # Pydantic models
-│
-├── scripts/                 # CLI scripts
-│   ├── test_connection.py   # Verify Ollama works
-│   ├── analyze_single.py    # Analyze one image
-│   ├── generate_embedding.py
-│   └── process_batch.py     # Process all images
-│
-├── test_images/             # Sample images (git tracked)
-│   └── ...
-│
-└── results/                 # Output (gitignored)
-    └── ...
+└── src/indexatron/
+    ├── __init__.py
+    ├── cli.py              # CLI entry point
+    ├── config.py           # Environment configuration
+    ├── service.py          # Main orchestration
+    ├── api_client.py       # the-mcculloughs.org API client
+    ├── analyzer.py         # LLaVA image analysis
+    ├── embedder.py         # Embedding generation
+    ├── family.py           # Nickname mappings
+    ├── models.py           # Pydantic models
+    └── logging.py          # Rich console output
 ```
 
-## 🔬 Usage
+## Usage
 
-### Test Ollama Connection
+### Process Pending Uploads
 
 ```bash
-python scripts/test_connection.py
+# Process all pending uploads
+indexatron
+
+# Process with a limit
+indexatron --limit 10
+
+# Debug mode (verbose output)
+indexatron --debug
 ```
 
-### Analyze a Single Image
+### Reprocess a Specific Photo
 
 ```bash
-python scripts/analyze_single.py test_images/photo.jpg
-# Output: results/analysis_photo.json
+indexatron --shortcode ABC123
 ```
 
-### Generate Embedding
+### Test Connections
 
 ```bash
-python scripts/generate_embedding.py test_images/photo.jpg
-# Output: results/embedding_photo.json
+indexatron test
 ```
 
-### Batch Process All Images
+### Show Configuration
 
 ```bash
-python scripts/process_batch.py
-# Output: results/batch_results.json
+indexatron config
+```
+
+### Dry Run (fetch without processing)
+
+```bash
+indexatron --dry-run
 ```
 
 ## 📊 Output Format
@@ -218,22 +242,12 @@ python scripts/process_batch.py
 - **Output**: 768-dimensional vectors
 - **Use case**: Finding similar photos via cosine similarity
 
-## 🔗 Related
+## Related
 
-This is part of a larger experiment:
-
-- **Rails API**: Provides photo storage and similarity search endpoints
-- **Indexatron** (this): Analyzes photos and generates embeddings
-- **Future**: UI for browsing results and finding similar photos
-
-## 📝 Experiment Log
-
-### 2026-02-22
-
-- Initial project setup
-- Testing LLaVA on family photos
-- Generating first embeddings
+- [the-mcculloughs.org](https://github.com/swmcc/the-mcculloughs.org) - Rails family photo app with pgvector
+- [Blog: Indexatron](https://swm.cc/writing/indexatron-local-llm-photo-analysis/) - Original experiment write-up
+- [Blog: Context-Aware Analysis](https://swm.cc/writing/indexatron-context-aware-analysis/) - How prompt injection improved results
 
 ---
 
-*🤖 Built with curiosity and local LLMs*
+*Built with curiosity and local LLMs*
