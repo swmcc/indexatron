@@ -162,10 +162,17 @@ class IndexatronService:
         image_path = self.api_client.download_image(upload)
 
         try:
-            # Analyze with LLaVA
-            debug(f"Analyzing {short_code} with LLaVA...")
+            # Build metadata context from upload
+            metadata = {
+                "title": upload.get("title"),
+                "caption": upload.get("caption"),
+                "date_taken": upload.get("date_taken"),
+            }
+
+            # Analyze with vision model
+            debug(f"Analyzing {short_code} with vision model...")
             start = time.time()
-            analysis = self.analyzer.analyze(image_path)
+            analysis = self.analyzer.analyze(image_path, metadata=metadata)
             elapsed = time.time() - start
 
             analysis_data = analysis.model_dump(mode="json")

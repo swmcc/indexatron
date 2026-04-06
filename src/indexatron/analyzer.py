@@ -35,7 +35,7 @@ CATEGORY_HIERARCHY = {
     "kids": ["family", "children"],
 }
 
-ANALYSIS_PROMPT = """Analyze this family photo and provide a detailed JSON response:
+BASE_ANALYSIS_PROMPT = """Analyze this family photo and provide a detailed JSON response:
 
 {
   "description": "A detailed description of what's happening in the photo",
@@ -46,6 +46,7 @@ ANALYSIS_PROMPT = """Analyze this family photo and provide a detailed JSON respo
   },
   "people": [
     {
+      "name": "person's name if known from context, or null",
       "description": "description of the person",
       "estimated_age": "age or age range like '8 years old' or '30s'",
       "position": "where in the frame: left, center, right, background"
@@ -77,6 +78,50 @@ For categories, include BOTH specific and general tags. Examples:
 Respond with ONLY valid JSON, no other text."""
 
 
+def build_analysis_prompt(metadata: dict | None = None) -> str:
+    """Build the analysis prompt, optionally with metadata context.
+
+    Args:
+        metadata: Optional dict with title, caption, date_taken
+
+    Returns:
+        Complete prompt string
+    """
+    if not metadata:
+        return BASE_ANALYSIS_PROMPT
+
+    # Build context section from available metadata
+    context_parts = []
+
+    if metadata.get("title"):
+        context_parts.append(f"Title: {metadata['title']}")
+
+    if metadata.get("caption"):
+        context_parts.append(f"Caption: {metadata['caption']}")
+
+    if metadata.get("date_taken"):
+        context_parts.append(f"Date taken: {metadata['date_taken']}")
+
+    if not context_parts:
+        return BASE_ANALYSIS_PROMPT
+
+    context_section = "\n".join(context_parts)
+
+    # Insert context before the JSON schema
+    context_prompt = f"""The following context is known about this photo:
+{context_section}
+
+Use this context to:
+- Identify people by name if mentioned (e.g., "John's wedding" means the groom may be John)
+- Confirm or refine the era estimate based on the date
+- Extract location hints from the title/caption
+- Add relevant categories based on mentioned events or people
+
+{BASE_ANALYSIS_PROMPT}"""
+
+    return context_prompt
+
+
 class PhotoAnalyzer:
     """Analyzes photos using Llama 3.2 Vision model."""
 
@@ -102,12 +147,33 @@ class PhotoAnalyzer:
 
         return sorted(enriched)
 
-    def analyze(self, image_path: Path) -> PhotoAnalysis:
-        """Analyze a single image and return structured results."""
+    def analyze(self, image_path: Path, metadata: dict | None = None) -> PhotoAnalysis:
+        """Analyze a single image and return structured results.
+
+        Args:
+            image_path: Path to the image file
+            metadata: Optional dict with title, caption, date_taken for context
+
+        Returns:
+            PhotoAnalysis with structured results
+        """
         if not image_path.exists():
             raise FileNotFoundError(f"Image not found: {image_path}")
 
         console.print(f"\n[bold blue]🔍 Analyzing:[/bold blue] {image_path.name}")
+
+        if metadata and any(metadata.values()):
+            context_parts = []
+            if metadata.get("title"):
+                context_parts.append(f"Title: {metadata['title']}")
+            if metadata.get("caption"):
+                context_parts.append(f"Caption: {metadata['caption']}")
+            if metadata.get("date_taken"):
+                context_parts.append(f"Date: {metadata['date_taken']}")
+            console.print(f"[dim]Context: {', '.join(context_parts)}[/dim]")
+
+        # Build prompt with optional metadata context
+        prompt = build_analysis_prompt(metadata)
 
         # Call vision model with the image
         response = ollama.chat(
@@ -115,7 +181,7 @@ class PhotoAnalyzer:
             messages=[
                 {
                     "role": "user",
-                    "content": ANALYSIS_PROMPT,
+                    "content": prompt,
                     "images": [str(image_path)],
                 }
             ],
@@ -212,6 +278,7 @@ class PhotoAnalyzer:
             if isinstance(person_data, dict):
                 people.append(
                     PersonInfo(
+                        name=person_data.get("name"),
                         description=person_data.get("description", "person"),
                         estimated_age=person_data.get("estimated_age"),
                         position=person_data.get("position"),
