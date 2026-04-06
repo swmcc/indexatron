@@ -186,6 +186,19 @@ class IndexatronService:
             elapsed = time.time() - start
 
             analysis_data = analysis.model_dump(mode="json")
+
+            # Override era with actual date_taken if available (don't trust AI guess)
+            if metadata.get("date_taken"):
+                from .analyzer import _extract_decade_from_date
+                decade = _extract_decade_from_date(str(metadata["date_taken"]))
+                if decade:
+                    analysis_data["era"] = {
+                        "decade": decade,
+                        "confidence": "high",
+                        "reasoning": f"From actual date: {metadata['date_taken']}",
+                    }
+                    debug(f"Overrode era with actual date: {decade}")
+
             # Remove raw_response from what we send to API (too large)
             api_analysis = {k: v for k, v in analysis_data.items() if k != "raw_response"}
 
