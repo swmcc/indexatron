@@ -237,20 +237,24 @@ class PhotoAnalyzer:
         # Build prompt with optional metadata context
         prompt = build_analysis_prompt(metadata)
 
-        # Call vision model with the image
-        response = ollama.chat(
-            model=self.model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                    "images": [str(image_path)],
-                }
-            ],
-        )
+        # Call vision model with the image (show spinner while waiting)
+        import time
+        start_time = time.time()
+        with console.status(f"[bold blue]Waiting for {self.model}...[/bold blue]"):
+            response = ollama.chat(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                        "images": [str(image_path)],
+                    }
+                ],
+            )
+            elapsed = time.time() - start_time
 
         raw_response = response.message.content
-        console.print(f"[dim]Raw response length: {len(raw_response)} chars[/dim]")
+        console.print(f"[dim]Response: {len(raw_response)} chars in {elapsed:.1f}s[/dim]")
 
         # Parse the JSON response
         analysis_data = self._parse_response(raw_response)
