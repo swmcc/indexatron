@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterator
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 from .analyzer import PhotoAnalyzer
 from .embedder import TextEmbedder
@@ -35,7 +35,7 @@ class BatchProcessor:
     def process_all(self, skip_existing: bool = True) -> dict:
         """Process all images and return combined results."""
         images = list(self.find_images())
-        console.print(f"\n[bold blue]🤖 Indexatron Batch Processing[/bold blue]")
+        console.print("\n[bold blue]🤖 Indexatron Batch Processing[/bold blue]")
         console.print(f"Found {len(images)} images in {self.images_dir}\n")
 
         results = []
@@ -95,7 +95,7 @@ class BatchProcessor:
         with open(output_file, "w") as f:
             json.dump(output, f, indent=2, default=str)
 
-        console.print(f"\n[bold green]✓ Batch processing complete![/bold green]")
+        console.print("\n[bold green]✓ Batch processing complete![/bold green]")
         console.print(f"  Processed: {output['processed']}/{output['total_images']}")
         console.print(f"  Total time: {output['total_time_seconds']:.1f}s")
         console.print(f"  Results: {output_file}\n")

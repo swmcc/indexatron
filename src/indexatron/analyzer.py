@@ -7,7 +7,8 @@ from pathlib import Path
 import ollama
 from rich.console import Console
 
-from .models import PhotoAnalysis, LocationInfo, PersonInfo, EraEstimate
+from .config import get_settings
+from .models import EraEstimate, LocationInfo, PersonInfo, PhotoAnalysis
 
 console = Console()
 
@@ -77,9 +78,11 @@ Respond with ONLY valid JSON, no other text."""
 
 
 class PhotoAnalyzer:
-    """Analyzes photos using LLaVA vision model."""
+    """Analyzes photos using Llama 3.2 Vision model."""
 
-    MODEL = "llava:7b"
+    def __init__(self):
+        self.settings = get_settings()
+        self.model = self.settings.vision_model
 
     def _enrich_categories(self, categories: list) -> list[str]:
         """Add parent categories based on hierarchy mapping."""
@@ -106,9 +109,9 @@ class PhotoAnalyzer:
 
         console.print(f"\n[bold blue]🔍 Analyzing:[/bold blue] {image_path.name}")
 
-        # Call LLaVA with the image
+        # Call vision model with the image
         response = ollama.chat(
-            model=self.MODEL,
+            model=self.model,
             messages=[
                 {
                     "role": "user",
@@ -125,7 +128,7 @@ class PhotoAnalyzer:
         analysis_data = self._parse_response(raw_response)
 
         # Build the structured result
-        return self._build_analysis(image_path.name, analysis_data, raw_response)
+        return self._build_analysis(image_path.name, analysis_data, raw_response, self.model)
 
     def _parse_response(self, response: str) -> dict:
         """Parse JSON from LLM response, handling common issues."""
@@ -148,7 +151,7 @@ class PhotoAnalyzer:
                     # Find the last complete object
                     fixed = self._fix_json(json_str)
                     return json.loads(fixed)
-                except:
+                except (json.JSONDecodeError, ValueError):
                     pass
 
         # Try to find JSON object in the response
@@ -190,7 +193,7 @@ class PhotoAnalyzer:
         return json_str
 
     def _build_analysis(
-        self, filename: str, data: dict, raw_response: str
+        self, filename: str, data: dict, raw_response: str, model: str
     ) -> PhotoAnalysis:
         """Build a PhotoAnalysis from parsed data."""
         # Parse location
@@ -258,6 +261,7 @@ class PhotoAnalyzer:
 
         return PhotoAnalysis(
             filename=filename,
+            model_used=model,
             description=data.get("description", "No description available"),
             location=location,
             people=people,

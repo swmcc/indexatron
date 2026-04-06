@@ -39,7 +39,7 @@ class OllamaClient:
 
         try:
             models = self.list_models()
-            console.print(f"[green]✓[/green] Connected to Ollama")
+            console.print("[green]✓[/green] Connected to Ollama")
             console.print(f"[green]✓[/green] Found {len(models)} model(s)\n")
 
             status = self.check_required_models()
