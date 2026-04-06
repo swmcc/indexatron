@@ -98,6 +98,45 @@ class McculloghsClient:
             error(f"Request failed: {e}")
             raise ApiError(str(e)) from e
 
+    def fetch_upload_by_shortcode(self, shortcode: str) -> dict[str, Any] | None:
+        """Fetch a single upload by shortcode.
+
+        Args:
+            shortcode: The upload's short_code
+
+        Returns:
+            Upload dict or None if not found
+        """
+        url = f"{self.base_url}/api/uploads/{shortcode}"
+
+        debug_request("GET", url)
+        start = time.time()
+
+        try:
+            response = self._client.get(url)
+            elapsed = time.time() - start
+            debug_response(response.status_code, elapsed=elapsed)
+
+            if response.status_code == 404:
+                return None
+
+            if response.status_code == 401:
+                raise ApiError("Unauthorized - check your API key", 401)
+
+            response.raise_for_status()
+            data = response.json()
+
+            return data.get("upload")
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return None
+            error(f"API error: {e.response.status_code}")
+            raise ApiError(str(e), e.response.status_code) from e
+        except httpx.RequestError as e:
+            error(f"Request failed: {e}")
+            raise ApiError(str(e)) from e
+
     def download_image(self, upload: dict[str, Any]) -> Path:
         """Download an image to the temp directory.
 

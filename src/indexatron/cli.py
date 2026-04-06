@@ -43,6 +43,13 @@ def main():
         help="Fetch uploads but don't process them",
     )
 
+    parser.add_argument(
+        "--shortcode",
+        "-s",
+        type=str,
+        help="Process a specific upload by shortcode (for reprocessing)",
+    )
+
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -81,6 +88,8 @@ def main():
         _cmd_config(settings)
     elif args.dry_run:
         _cmd_dry_run(settings, args.limit)
+    elif args.shortcode:
+        _cmd_reprocess(settings, args.shortcode)
     else:
         _cmd_run(settings, args.limit)
 
@@ -184,6 +193,19 @@ def _cmd_dry_run(settings, limit: int | None):
         console.print(f"  • {u['short_code']} (ID: {u['id']}) - {u['created_at']}")
 
     console.print()
+
+
+def _cmd_reprocess(settings, shortcode: str):
+    """Reprocess a specific upload by shortcode."""
+    from .service import IndexatronService
+
+    console.print(f"\n[bold]Reprocessing upload: {shortcode}[/bold]\n")
+
+    with IndexatronService() as service:
+        success = service.process_by_shortcode(shortcode)
+
+    if not success:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

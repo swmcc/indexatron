@@ -168,6 +168,7 @@ class IndexatronService:
                 "caption": upload.get("caption"),
                 "date_taken": upload.get("date_taken"),
                 "gallery_name": upload.get("gallery_name"),
+                "gallery_description": upload.get("gallery_description"),
             }
 
             # Log metadata if present
@@ -240,6 +241,47 @@ class IndexatronService:
             return True
         except Exception as e:
             failure(f"Upload {upload_id} failed: {e}")
+            if self.settings.debug:
+                console.print_exception()
+            return False
+
+    def process_by_shortcode(self, shortcode: str) -> bool:
+        """Process a single upload by shortcode (for reprocessing).
+
+        Args:
+            shortcode: The upload's short_code
+
+        Returns:
+            True if successful
+        """
+        setup_logging()
+        debug_config()
+
+        console.print(f"\n[bold blue]🔄 Reprocessing: {shortcode}[/bold blue]\n")
+
+        # Verify connections first
+        if not self._verify_connections():
+            return False
+
+        # Fetch the specific upload
+        upload = self.api_client.fetch_upload_by_shortcode(shortcode)
+
+        if not upload:
+            error(f"Upload '{shortcode}' not found")
+            return False
+
+        info(f"Found upload: ID={upload['id']}, shortcode={upload['short_code']}")
+
+        try:
+            import time
+            start_time = time.time()
+            self._process_upload(upload)
+            elapsed = time.time() - start_time
+
+            success(f"Upload {shortcode} reprocessed in {elapsed:.1f}s")
+            return True
+        except Exception as e:
+            failure(f"Upload {shortcode} failed: {e}")
             if self.settings.debug:
                 console.print_exception()
             return False
