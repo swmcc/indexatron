@@ -44,51 +44,60 @@ BLOCKED_TERMS = {
 # Maximum number of categories to keep (prevents runaway repetition)
 MAX_CATEGORIES = 20
 
-BASE_ANALYSIS_PROMPT = """Analyze this family photo and provide a detailed JSON response:
+BASE_ANALYSIS_PROMPT = """Analyze this family photo. Return ONLY valid JSON:
 
 {
-  "description": "A detailed description of what's happening in the photo",
-  "location": {
-    "setting": "general setting like beach, park, home, restaurant",
-    "type": "indoor or outdoor",
-    "specific": "specific location if identifiable, or null"
-  },
-  "people": [
-    {
-      "name": "person's name if known from context, or null",
-      "description": "description of the person",
-      "estimated_age": "age or age range like '8 years old' or '30s'",
-      "position": "where in the frame: left, center, right, background"
-    }
-  ],
-  "categories": ["hierarchical", "tags", "from specific to general"],
-  "era": {
-    "decade": "estimated decade like 1990s or 2000s",
-    "confidence": "low, medium, or high",
-    "reasoning": "why you think this era"
-  },
-  "mood": "the emotional tone of the photo",
-  "colors": ["notable", "colors"],
-  "objects": ["visible", "objects"]
+  "description": "what is happening in the photo",
+  "location": {"setting": "place type", "type": "indoor/outdoor"},
+  "people": [{"name": "name or null", "description": "who", "estimated_age": "age"}],
+  "categories": ["5-10 relevant tags only"],
+  "era": {"decade": "1990s", "confidence": "high/medium/low"},
+  "mood": "emotional tone",
+  "colors": ["main colors"],
+  "objects": ["visible objects"]
 }
 
-Focus on:
-- Family relationships if apparent
-- Activities happening
-- Special occasions (birthdays, holidays, christmas, easter, etc.)
-- Photo quality and style for era estimation
-- Clothing and objects for context
+RULES: Max 10 categories. No repetition. JSON only."""
 
-For categories, include BOTH specific and general tags. Examples:
-- A puppy photo: ["puppy", "dog", "pet", "animal"]
-- A Christmas photo: ["christmas", "holiday", "celebration", "family"]
-- A baby photo: ["baby", "infant", "child", "family"]
 
-Respond with ONLY valid JSON, no other text."""
+def _extract_names_from_text(text: str) -> list[str]:
+    """Extract potential names from caption/title text."""
+    import re
+
+    names = []
+    # Common patterns: "John and Mary", "John's birthday", "with Sarah"
+    # Look for capitalized words that aren't common words
+    common_words = {
+        "the", "and", "with", "at", "in", "on", "for", "to", "of", "a", "an",
+        "birthday", "wedding", "christmas", "easter", "holiday", "vacation",
+        "party", "celebration", "photo", "picture", "day", "night", "morning",
+        "home", "house", "beach", "park", "garden", "church", "school",
+    }
+
+    # Find capitalized words
+    words = re.findall(r"\b([A-Z][a-z]+)\b", text)
+    for word in words:
+        if word.lower() not in common_words:
+            names.append(word)
+
+    return list(set(names))
+
+
+def _extract_decade_from_date(date_str: str) -> str | None:
+    """Extract decade from a date string."""
+    import re
+
+    # Try to find a year
+    year_match = re.search(r"(19|20)\d{2}", str(date_str))
+    if year_match:
+        year = int(year_match.group())
+        decade = (year // 10) * 10
+        return f"{decade}s"
+    return None
 
 
 def build_analysis_prompt(metadata: dict | None = None) -> str:
-    """Build the analysis prompt, optionally with metadata context.
+    """Build the analysis prompt with explicit metadata instructions.
 
     Args:
         metadata: Optional dict with title, caption, date_taken
@@ -96,39 +105,47 @@ def build_analysis_prompt(metadata: dict | None = None) -> str:
     Returns:
         Complete prompt string
     """
-    if not metadata:
+    if not metadata or not any(metadata.values()):
         return BASE_ANALYSIS_PROMPT
 
-    # Build context section from available metadata
-    context_parts = []
+    # Build directive instructions based on metadata
+    directives = []
+
+    # Extract names from title/caption
+    all_text = f"{metadata.get('title', '')} {metadata.get('caption', '')}"
+    names = _extract_names_from_text(all_text)
+
+    if names:
+        names_str = ", ".join(names)
+        directives.append(
+            f"IMPORTANT: This photo includes {names_str}. "
+            f"Use these names in the 'people' array where you can identify them."
+        )
+
+    # Extract decade from date
+    if metadata.get("date_taken"):
+        decade = _extract_decade_from_date(str(metadata["date_taken"]))
+        if decade:
+            directives.append(
+                f"IMPORTANT: This photo is from {metadata['date_taken']} ({decade}). "
+                f"Use this as the era decade with 'high' confidence."
+            )
+
+    # Add caption context
+    if metadata.get("caption"):
+        directives.append(f"Caption says: \"{metadata['caption']}\"")
 
     if metadata.get("title"):
-        context_parts.append(f"Title: {metadata['title']}")
+        directives.append(f"Title: \"{metadata['title']}\"")
 
-    if metadata.get("caption"):
-        context_parts.append(f"Caption: {metadata['caption']}")
-
-    if metadata.get("date_taken"):
-        context_parts.append(f"Date taken: {metadata['date_taken']}")
-
-    if not context_parts:
+    if not directives:
         return BASE_ANALYSIS_PROMPT
 
-    context_section = "\n".join(context_parts)
+    directive_text = "\n".join(directives)
 
-    # Insert context before the JSON schema
-    context_prompt = f"""The following context is known about this photo:
-{context_section}
-
-Use this context to:
-- Identify people by name if mentioned (e.g., "John's wedding" means the groom may be John)
-- Confirm or refine the era estimate based on the date
-- Extract location hints from the title/caption
-- Add relevant categories based on mentioned events or people
+    return f"""{directive_text}
 
 {BASE_ANALYSIS_PROMPT}"""
-
-    return context_prompt
 
 
 class PhotoAnalyzer:
