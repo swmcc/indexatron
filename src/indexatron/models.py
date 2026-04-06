@@ -17,6 +17,7 @@ class LocationInfo(BaseModel):
 class PersonInfo(BaseModel):
     """Information about a person in the photo."""
 
+    name: Optional[str] = Field(default=None, description="Person's name if known from context")
     description: str = Field(description="Description of the person")
     estimated_age: Optional[str] = Field(default=None, description="Estimated age or age range")
     position: Optional[str] = Field(default=None, description="Position in frame")
